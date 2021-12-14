@@ -20,6 +20,7 @@ namespace AmisDeNoel
 
                 try
                 {
+                    Console.WriteLine($"Sening invite to {match.Giver.Name} ...");
                     using (var smtpClient = new SmtpClient("smtp.gmail.com", 587))
                     {
                         smtpClient.UseDefaultCredentials = false;

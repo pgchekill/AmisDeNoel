@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using System.Diagnostics;
 
 namespace AmisDeNoel
 {
@@ -29,7 +30,6 @@ namespace AmisDeNoel
             var pass = credentials[1];
 
             FriendEmailSender.SendEmails(matches, htmlTemplatePath, user, pass);
-
         }
 
         private static List<ChristmasMatch> GetMatches(List<Ami> friends, List<ChristmasMatch> forbidenMatches, Random seed)
@@ -65,6 +65,8 @@ namespace AmisDeNoel
         {
             var isNotValid = true;
             var match = default(ChristmasMatch);
+            var stopWatch = new Stopwatch();
+            stopWatch.Start();
             while (isNotValid || match == null)
             {
                 match = DrawReceiver(currentGiver, receivers, givers, seed, friends);
@@ -88,6 +90,9 @@ namespace AmisDeNoel
                 {
                     isNotValid = true;
                 }
+
+                if (stopWatch.Elapsed.TotalSeconds > 2)
+                    throw new Exception("Couldn't find a suitable match line... Please retry.");
             }
 
             return match;
