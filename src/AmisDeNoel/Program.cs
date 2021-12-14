@@ -22,7 +22,7 @@ namespace AmisDeNoel
                         .ToList();
 
             var seed = new Random();
-            var matches = GetMatches(friends, forbidenFriends, seed);
+            var matches = GetMatchesEmpiric(friends, forbidenFriends, seed, 100);
 
             var htmlTemplate = File.ReadAllText(htmlTemplatePath);
             var credentials = File.ReadAllLines(crendentialsPaths);
@@ -30,6 +30,34 @@ namespace AmisDeNoel
             var pass = credentials[1];
 
             FriendEmailSender.SendEmails(matches, htmlTemplatePath, user, pass);
+        }
+
+        private static List<ChristmasMatch> GetMatchesEmpiric(List<Ami> friends, List<ChristmasMatch> forbidenMatches, Random seed, int nbOfTries)
+        {
+            var count = 0;
+            var matches = default(List<ChristmasMatch>);
+            for (int i = 0; i < nbOfTries; i++)
+            {
+                try
+                {
+                    count++;
+                    matches = GetMatches(friends, forbidenMatches, seed);
+
+                    if (matches != default(List<ChristmasMatch>))
+                        break;
+                }
+                catch
+                {
+                    // do nothing
+                }
+            }
+
+            if (matches == default(List<ChristmasMatch>))
+                throw new Exception($"Faile to find suitable matches!");
+
+            Console.WriteLine($"Found suitable matches after {count} tries!");
+
+            return matches;
         }
 
         private static List<ChristmasMatch> GetMatches(List<Ami> friends, List<ChristmasMatch> forbidenMatches, Random seed)
@@ -47,8 +75,16 @@ namespace AmisDeNoel
                 _ = receivers.Remove(match.Receiver.Name);
 
                 currentGiver = match.Receiver.Name;
+                if (!givers.Contains(currentGiver) && givers.Count > 0)
+                    currentGiver = givers[seed.Next(0, givers.Count)];
 
                 matches.Add(match);
+            }
+
+            if (matches.DistinctBy(m => m.Giver.Name).Count() != matches.Count()
+               || matches.DistinctBy(m => m.Receiver.Name).Count() != matches.Count())
+            {
+                throw new Exception($"Failed to find suitable matches! Please re-run!");
             }
 
             return matches;
@@ -84,9 +120,13 @@ namespace AmisDeNoel
                             .Where(m => m.IsEqual(match))
                             .Any();
 
+                var iAlreadyReceived = !receivers.Contains(match.Receiver.Name);
+                var isLastMatch = !givers.Contains(match.Receiver.Name) && givers.Count == 1;
+
                 if (match.Giver.Name == match.Receiver.Name
                     || inverseMatch != null
-                    || isFobidenMatch)
+                    || isFobidenMatch
+                    || iAlreadyReceived)
                 {
                     isNotValid = true;
                 }
