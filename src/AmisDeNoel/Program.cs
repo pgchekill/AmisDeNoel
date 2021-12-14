@@ -1,6 +1,4 @@
 ﻿using Newtonsoft.Json;
-using System.Net;
-using System.Net.Mail;
 
 namespace AmisDeNoel
 {
@@ -10,44 +8,27 @@ namespace AmisDeNoel
         {
             var configPath = @"C:\Users\gerber\Documents\git-p\amis-de-noel\amis.json";
             var crendentialsPaths = @"C:\Users\gerber\Documents\git-p\amis-de-noel\app-pass.txt";
-
+            var htmlTemplatePath = @"C:\Users\gerber\Documents\git-p\amis-de-noel\src\AmisDeNoel\email-template.html";
+            
             var json = File.ReadAllText(configPath);
             var friends = JsonConvert.DeserializeObject<List<Ami>>(json);
-            var forbidenMatches = new List<ChristmasMatch>()
-            {
-                new ChristmasMatch("Véro", "Fabien"),
-                new ChristmasMatch("Fabien", "Véro"),
-                new ChristmasMatch("Diane", "Philippe"),
-                new ChristmasMatch("Philippe", "Diane"),
-                new ChristmasMatch("Carmen", "Fernand"),
-                new ChristmasMatch("Fernand", "Carmen")
-            };
+            var forbidenFriends =
+                    friends
+                        .Where(f => f.ForbidenFriends != null)
+                        .SelectMany(
+                            f => f.ForbidenFriends
+                                    .Select(ff => new ChristmasMatch(f.Name, ff)))
+                        .ToList();
 
             var seed = new Random();
-            var matches = GetMatches(friends, forbidenMatches, seed);
+            var matches = GetMatches(friends, forbidenFriends, seed);
 
-
+            var htmlTemplate = File.ReadAllText(htmlTemplatePath);
             var credentials = File.ReadAllLines(crendentialsPaths);
-            try
-            {
-                using (var smtpClient = new SmtpClient("smtp.gmail.com", 587))
-                {
-                    smtpClient.UseDefaultCredentials = false;
-                    smtpClient.Credentials = new NetworkCredential()
-                    {
-                        UserName = credentials[0],
-                        Password = credentials[1],
-                    };
-                    smtpClient.DeliveryMethod = SmtpDeliveryMethod.Network;
-                    smtpClient.EnableSsl = true;
+            var user = credentials[0];
+            var pass = credentials[1];
 
-                    smtpClient.Send("chekill.pg@gmail.com", "philippe.e.gerber@gmail.com", "Test amis", "this is a body");
-                }
-            }
-            catch (Exception e)
-            {
-                Console.Error.WriteLine("{0}: {1}", e.ToString(), e.Message);
-            }
+            FriendEmailSender.SendEmails(matches, htmlTemplatePath, user, pass);
 
         }
 
@@ -57,12 +38,15 @@ namespace AmisDeNoel
             var receivers = friends.Select(f => f.Name).ToList();
             var matchCount = friends.Count();
             var matches = new List<ChristmasMatch>();
+            var currentGiver = givers[seed.Next(0, givers.Count)];
             for (int i = 0; i < matchCount; i++)
             {
-                var match = GetMatch(forbidenMatches, seed, givers, receivers, matches, friends);
+                var match = GetMatch(currentGiver, forbidenMatches, seed, givers, receivers, matches, friends);
 
                 _ = givers.Remove(match.Giver.Name);
                 _ = receivers.Remove(match.Receiver.Name);
+
+                currentGiver = match.Receiver.Name;
 
                 matches.Add(match);
             }
@@ -71,6 +55,7 @@ namespace AmisDeNoel
         }
 
         private static ChristmasMatch GetMatch(
+            string currentGiver,
             List<ChristmasMatch> forbidenMatches,
             Random seed,
             List<string> givers,
@@ -78,13 +63,13 @@ namespace AmisDeNoel
             List<ChristmasMatch> matches,
             List<Ami> friends)
         {
-            var isValid = false;
+            var isNotValid = true;
             var match = default(ChristmasMatch);
-            while (!isValid && match == null)
+            while (isNotValid || match == null)
             {
-                match = DrawMatch(receivers, givers, seed, friends);
+                match = DrawReceiver(currentGiver, receivers, givers, seed, friends);
 
-                isValid = true;
+                isNotValid = false;
                 var inverseMatch =
                         matches
                             .Where(
@@ -97,27 +82,26 @@ namespace AmisDeNoel
                             .Where(m => m.IsEqual(match))
                             .Any();
 
-                if (match.Giver == match.Receiver
+                if (match.Giver.Name == match.Receiver.Name
                     || inverseMatch != null
-                    || givers.Contains(match.Receiver.Name)
                     || isFobidenMatch)
                 {
-                    isValid = false;
+                    isNotValid = true;
                 }
             }
 
             return match;
         }
 
-        private static ChristmasMatch DrawMatch(List<string> receivers, List<string> givers, Random seed, List<Ami> friends)
+        private static ChristmasMatch DrawReceiver(string currentGiver, List<string> receivers, List<string> givers, Random seed, List<Ami> friends)
         {
-            var g = seed.Next(0, givers.Count);
             var r = seed.Next(0, receivers.Count);
 
-            var giver = friends.Where(f => f.Name == givers[g]).Single();
+            var giver = friends.Where(f => f.Name == currentGiver).Single();
             var receiver = friends.Where(f => f.Name == receivers[r]).Single();
 
             var match = new ChristmasMatch() { Giver = giver, Receiver = receiver };
+
             return match;
         }
     }
