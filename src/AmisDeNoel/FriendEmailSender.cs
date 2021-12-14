@@ -31,8 +31,8 @@ namespace AmisDeNoel
                         };
                         smtpClient.DeliveryMethod = SmtpDeliveryMethod.Network;
                         smtpClient.EnableSsl = true;
-                        //match.Giver.Email
-                        var mail = new MailMessage(user, "philippe.e.gerber@gmail.com", "Oh oh oh", htmlContent);
+                        
+                        var mail = new MailMessage(user, match.Giver.Email, "Oh oh oh", htmlContent);
                         mail.IsBodyHtml = true;
                         smtpClient.Send(mail);
                     }
